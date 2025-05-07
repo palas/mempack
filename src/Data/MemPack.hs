@@ -1285,6 +1285,7 @@ instance MemPack (VarLen Word64) where
 instance MemPack (VarLen Word) where
   packedByteCount = packedVarLenByteCount
   {-# INLINE packedByteCount #-}
+#if !defined(wasm32_HOST_ARCH)
 #if WORD_SIZE_IN_BITS == 32
   packM mba v@(VarLen x) = p7 (p7 (p7 (p7 (p7 (errorTooManyBits "Word"))))) (numBits - 7)
     where
@@ -1312,6 +1313,20 @@ instance MemPack (VarLen Word) where
   {-# INLINE unpackM #-}
 #else
 #error "Only 32bit and 64bit systems are supported"
+#endif
+#else
+  packM v@(VarLen x) =
+    p7 (p7 (p7 (p7 (p7 (p7 (p7 (p7 (p7 (p7 (errorTooManyBits "Word")))))))))) (numBits - 7)
+    where
+      p7 = packIntoCont7 x
+      {-# INLINE p7 #-}
+      numBits = packedVarLenByteCount v * 7
+  {-# INLINE packM #-}
+  unpackM = do
+    let d7 = unpack7BitVarLen
+        {-# INLINE d7 #-}
+    VarLen <$> d7 (d7 (d7 (d7 (d7 (d7 (d7 (d7 (d7 (unpack7BitVarLenLast 0b_1111_1110))))))))) 0 0
+  {-# INLINE unpackM #-}
 #endif
 
 packedVarLenByteCount :: FiniteBits b => VarLen b -> Int
